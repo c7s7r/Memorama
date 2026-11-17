@@ -1,0 +1,1974 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memorama Pro — Juego y Creador de Mazos para el Salón</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fuente Inter de Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Tone.js para efectos de sonido suaves y agradables -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Canvas Confetti para celebración de victoria -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Estilos personalizados para animaciones 3D de las tarjetas y detalles visuales */
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+
+        .transform-style-3d {
+            transform-style: preserve-3d;
+            transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .backface-hidden {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+
+        /* Animación cuando se encuentra un par */
+        @keyframes matchPulse {
+            0% { transform: rotateY(180deg) scale(1); }
+            50% { transform: rotateY(180deg) scale(1.06); }
+            100% { transform: rotateY(180deg) scale(1); }
+        }
+
+        .card-matched .transform-style-3d {
+            animation: matchPulse 0.45s ease-out forwards;
+        }
+
+        /* Animación de sacudida suave cuando no coinciden */
+        @keyframes shakeMismatch {
+            0%, 100% { transform: rotateY(180deg) translateX(0); }
+            25% { transform: rotateY(180deg) translateX(-5px); }
+            75% { transform: rotateY(180deg) translateX(5px); }
+        }
+
+        .card-mismatch .transform-style-3d {
+            animation: shakeMismatch 0.35s ease-in-out;
+        }
+
+        /* Patrón sutil para el reverso de las cartas */
+        .card-pattern {
+            background-image: radial-gradient(rgba(255, 255, 255, 0.22) 1.5px, transparent 1.5px);
+            background-size: 14px 14px;
+        }
+
+        /* Scrollbar limpio para modales */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.4);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.65);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300">
+
+    <!-- Notificación Toast flotante (reemplaza alert) -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full px-4 sm:px-0"></div>
+
+    <!-- Barra Superior de Navegación -->
+    <header class="sticky top-0 z-30 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+            <!-- Logo y Título -->
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-violet-600 text-white flex items-center justify-center shadow-md shadow-brand-500/20 shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                </div>
+                <div class="truncate">
+                    <h1 class="font-bold text-lg sm:text-xl tracking-tight text-slate-900 dark:text-white truncate">Memorama Salón</h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block truncate">Juega, crea y comparte tus mazos personalizados</p>
+                </div>
+            </div>
+
+            <!-- Acciones Principales -->
+            <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+                <!-- Botón Sonido -->
+                <button id="btn-sound" onclick="toggleSound()" title="Activar/Desactivar sonido" class="p-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+                    <svg id="icon-sound-on" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    </svg>
+                    <svg id="icon-sound-off" class="w-5 h-5 hidden text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                    </svg>
+                </button>
+
+                <!-- Botón Modo Oscuro -->
+                <button id="btn-theme" onclick="toggleTheme()" title="Cambiar tema claro/oscuro" class="p-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+                    <!-- Sol (para modo oscuro) -->
+                    <svg id="icon-sun" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <!-- Luna (para modo claro) -->
+                    <svg id="icon-moon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                </button>
+
+                <!-- Botón Crear Nuevo Memorama -->
+                <button onclick="openEditorModal(null)" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-white font-semibold text-sm shadow-sm shadow-brand-600/20 transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Crear Memorama</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenido Principal -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+
+        <!-- Panel de Control del Mazo y Estadísticas -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            
+            <!-- Selector de Mazo y Acciones del Mazo -->
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 min-w-0">
+                <div class="flex-1 min-w-0">
+                    <label for="deck-selector" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+                        Mazo Seleccionado
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <select id="deck-selector" onchange="handleDeckChange(this.value)" class="w-full sm:max-w-md rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 px-3.5 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all cursor-pointer">
+                            <!-- Opciones llenadas por JS -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Botones de gestión del mazo actual / compartir -->
+                <div class="flex items-center gap-2 pt-1 sm:pt-5 flex-wrap">
+                    <button id="btn-edit-deck" onclick="editCurrentDeck()" title="Editar este mazo" class="hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        Editar
+                    </button>
+                    <button onclick="openDecksManagerModal()" title="Administrar, exportar o importar mazos de compañeros" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 hover:bg-brand-100 dark:hover:bg-brand-900/60 border border-brand-200/70 dark:border-brand-800/60 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        Mazos del Salón (<span id="deck-count-badge">1</span>)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Separador en escritorio -->
+            <div class="hidden lg:block w-px h-12 bg-slate-200 dark:bg-slate-800"></div>
+
+            <!-- Indicadores de Partida (Pares, Movimientos, Tiempo, Reiniciar) -->
+            <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-5 flex-wrap">
+                <!-- Pares encontrados -->
+                <div class="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/60 px-3.5 py-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-medium text-slate-400 uppercase">Pares</p>
+                        <p class="text-sm font-bold text-slate-800 dark:text-white"><span id="stat-pairs">0</span> / <span id="stat-total-pairs">16</span></p>
+                    </div>
+                </div>
+
+                <!-- Movimientos -->
+                <div class="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/60 px-3.5 py-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <div class="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" /></svg>
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-medium text-slate-400 uppercase">Intentos</p>
+                        <p id="stat-moves" class="text-sm font-bold text-slate-800 dark:text-white">0</p>
+                    </div>
+                </div>
+
+                <!-- Temporizador -->
+                <div class="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/60 px-3.5 py-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <div class="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-medium text-slate-400 uppercase">Tiempo</p>
+                        <p id="stat-timer" class="text-sm font-bold text-slate-800 dark:text-white tabular-nums">00:00</p>
+                    </div>
+                </div>
+
+                <!-- Botón Reiniciar Partida -->
+                <button onclick="resetGame()" title="Barajar y reiniciar partida" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white font-semibold text-xs sm:text-sm transition-all active:scale-95 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    <span>Reiniciar</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Barra de progreso y metadatos del mazo activo -->
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
+                <div class="flex items-center gap-2 truncate">
+                    <span id="active-deck-author" class="font-medium text-slate-700 dark:text-slate-300">Por: Sistema</span>
+                    <span>•</span>
+                    <span id="active-deck-desc" class="truncate">Mazo predeterminado de 16 pares</span>
+                </div>
+                <span id="progress-percentage" class="font-bold text-brand-600 dark:text-brand-400 shrink-0">0%</span>
+            </div>
+            <div class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div id="progress-bar" class="h-full bg-gradient-to-r from-brand-500 to-violet-500 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Tablero de Juego (Grid de Tarjetas) -->
+        <section id="game-board-wrapper" class="flex-1 flex items-center justify-center py-2">
+            <div id="game-board" class="grid gap-2.5 sm:gap-3.5 w-full transition-all duration-300">
+                <!-- Las tarjetas se renderizan aquí dinámicamente -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Pie de página discreto -->
+    <footer class="py-4 text-center text-xs text-slate-400 dark:text-slate-500 border-t border-slate-200/60 dark:border-slate-800/60 mt-auto">
+        <p>Memorama Interactivo del Salón • Crea tus propios mazos con imágenes y texto y compártelos en JSON</p>
+    </footer>
+
+    <!-- =====================================================================
+         MODAL 1: VICTORIA AL COMPLETAR EL JUEGO
+    ====================================================================== -->
+    <div id="victory-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 text-center transform transition-all scale-95 opacity-0" id="victory-modal-content">
+            <!-- Icono / Medalla -->
+            <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-amber-950 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                <svg class="w-11 h-11" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+            </div>
+
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mb-1">¡Excelente trabajo!</h2>
+            <p id="victory-deck-name" class="text-sm text-slate-500 dark:text-slate-400 mb-5">Has completado el memorama</p>
+
+            <!-- Estrellas obtenidas -->
+            <div id="victory-stars" class="flex items-center justify-center gap-2 mb-6 text-3xl">
+                <!-- Estrellas dinámicas -->
+            </div>
+
+            <!-- Resumen de estadísticas -->
+            <div class="grid grid-cols-3 gap-3 bg-slate-50 dark:bg-slate-800/70 rounded-2xl p-4 mb-6 border border-slate-100 dark:border-slate-800">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium">Pares</p>
+                    <p id="victory-pairs" class="text-lg font-bold text-slate-800 dark:text-white">16</p>
+                </div>
+                <div class="border-x border-slate-200 dark:border-slate-700">
+                    <p class="text-xs text-slate-400 font-medium">Intentos</p>
+                    <p id="victory-moves" class="text-lg font-bold text-slate-800 dark:text-white">24</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-400 font-medium">Tiempo</p>
+                    <p id="victory-time" class="text-lg font-bold text-slate-800 dark:text-white">01:15</p>
+                </div>
+            </div>
+
+            <!-- Botones de acción -->
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button onclick="closeVictoryModal(); resetGame();" class="flex-1 py-3 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm shadow-md shadow-brand-600/20 transition-all">
+                    Jugar de nuevo
+                </button>
+                <button onclick="closeVictoryModal(); openDecksManagerModal();" class="flex-1 py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm transition-all">
+                    Elegir otro mazo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         MODAL 2: CREADOR / EDITOR DE MEMORAMAS PERSONALIZADOS
+    ====================================================================== -->
+    <div id="editor-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-sm p-2 sm:p-4">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full max-h-[94vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            
+            <!-- Cabecera del Modal Editor -->
+            <div class="px-5 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-900">
+                <div>
+                    <h2 id="editor-modal-title" class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">Crear Memorama Personalizado</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Configura la cantidad de pares y añade texto, imágenes o ambos a cada tarjeta</p>
+                </div>
+                <button onclick="closeEditorModal()" class="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <!-- Cuerpo desplazable del Editor -->
+            <div class="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6">
+                
+                <!-- Datos Generales y Cantidad de Pares -->
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-800">
+                    <div class="sm:col-span-5">
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Nombre del Memorama *</label>
+                        <input type="text" id="editor-deck-title" placeholder="Ej. Capitales del Mundo, Biología Celular..." class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+
+                    <div class="sm:col-span-4">
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Tu Nombre (Autor)</label>
+                        <input type="text" id="editor-deck-author" placeholder="Ej. Carlos Pérez (3°B)" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+
+                    <div class="sm:col-span-3 relative">
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Cantidad de Pares</label>
+                        <button type="button" id="btn-pair-dropdown" onclick="togglePairDropdown(event)" class="w-full h-[42px] px-3.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-brand-500 dark:hover:border-brand-500 font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center justify-between transition-all shadow-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <span id="pair-dropdown-label">8 pares</span>
+                            <svg class="w-4 h-4 text-slate-400 transition-transform duration-200" id="pair-dropdown-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <!-- Menú desplegable de 1 a 16 pares -->
+                        <div id="pair-dropdown-menu" class="hidden absolute right-0 sm:left-0 mt-1.5 w-48 max-h-60 overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl z-40 py-1.5">
+                            <!-- Opciones 1 a 16 generadas dinámicamente -->
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-12">
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Descripción breve (opcional)</label>
+                        <input type="text" id="editor-deck-desc" placeholder="Ej. Repaso para el examen parcial de historia" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+
+                    <!-- Indicador de peso del mazo en la nube -->
+                    <div class="sm:col-span-12 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200/70 dark:border-slate-700/70">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            Se guardará en Firestore (memoramas_salon) para todo el salón
+                        </span>
+                        <span id="editor-size-indicator" class="font-semibold text-slate-600 dark:text-slate-300">Peso estimado: 2 KB / 950 KB</span>
+                    </div>
+                </div>
+
+                <!-- Tip de uso -->
+                <div class="flex items-start gap-3 p-3.5 rounded-2xl bg-brand-50/80 dark:bg-brand-950/40 border border-brand-200/70 dark:border-brand-800/50 text-xs text-brand-900 dark:text-brand-200">
+                    <svg class="w-5 h-5 text-brand-600 dark:text-brand-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <p>
+                        <strong>¡Muy fácil!</strong> Haz clic en el botón <strong>"+"</strong> en el centro de cada tarjeta para agregar una <strong>foto</strong>, <strong>texto</strong> o ambos. Usa <strong>"Copiar A → B"</strong> si quieres que ambas tarjetas sean iguales.
+                    </p>
+                </div>
+
+                <!-- Lista Dinámica de Pares -->
+                <div id="editor-pairs-list" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <!-- Los bloques de cada par se generan aquí -->
+                </div>
+
+            </div>
+
+            <!-- Pie del Modal Editor -->
+            <div class="px-5 sm:px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900 flex items-center justify-between gap-3">
+                <button type="button" onclick="closeEditorModal()" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-save-deck" onclick="saveCustomDeck()" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-semibold text-sm shadow-md shadow-brand-600/20 transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                    <span>Guardar en la Nube y Jugar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         MODAL 3: GESTOR DE MAZOS DEL SALÓN (SELECCIONAR, BUSCAR, IMPORTAR, EXPORTAR)
+    ====================================================================== -->
+    <div id="decks-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-sm p-2 sm:p-4">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            
+            <!-- Cabecera -->
+            <div class="px-5 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-900">
+                <div>
+                    <div class="flex items-center gap-2.5">
+                        <h2 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">Mazos del Salón</h2>
+                        <span id="cloud-sync-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Sincronizado en vivo
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Todos los memoramas guardados por tus compañeros aparecen aquí al instante en cualquier dispositivo</p>
+                </div>
+                <button onclick="closeDecksManagerModal()" class="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <!-- Barra de búsqueda y herramientas -->
+            <div class="px-5 sm:px-6 py-3 bg-slate-100/70 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div class="relative flex-1">
+                    <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    <input type="text" id="decks-search-input" oninput="renderDecksManagerList()" placeholder="Buscar mazo por nombre o compañero (ej. Orientación)..." class="w-full pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:border-brand-500 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs transition-all" title="Importar respaldo en JSON">
+                        <svg class="w-4 h-4 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                        <span>Importar JSON</span>
+                        <input type="file" accept=".json,application/json" onchange="importDeckFromJSON(event)" class="hidden">
+                    </label>
+                    <button onclick="closeDecksManagerModal(); openEditorModal(null);" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
+                        Crear Nuevo
+                    </button>
+                </div>
+            </div>
+
+            <!-- Lista de Mazos -->
+            <div id="decks-list-container" class="p-5 sm:p-6 overflow-y-auto flex-1 space-y-3">
+                <!-- Tarjetas de mazos generadas dinámicamente -->
+            </div>
+
+            <!-- Pie -->
+            <div class="px-5 sm:px-6 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900 flex items-center justify-between">
+                <span class="text-[11px] text-slate-400 dark:text-slate-500">Compartido en tiempo real con todo el grupo</span>
+                <button onclick="closeDecksManagerModal()" class="px-5 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-sm font-semibold transition-colors">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         LÓGICA DE LA APLICACIÓN + SINCRONIZACIÓN EN LA NUBE (FIREBASE)
+    ====================================================================== -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import {
+            getFirestore,
+            collection,
+            doc,
+            addDoc,
+            updateDoc,
+            deleteDoc,
+            onSnapshot,
+            serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+        // =====================================================================
+        // 1. MAZO PREDETERMINADO DE 16 PARES (32 TARJETAS)
+        // =====================================================================
+        const DEFAULT_DECK = {
+            id: 'default_16_pairs',
+            title: 'Cultura General y Ciencia (16 Pares)',
+            author: 'Sistema',
+            description: 'Mazo predeterminado completo de 16 pares (32 tarjetas)',
+            isDefault: true,
+            pairs: [
+                { id: 1, cardA: { text: 'Sistema Solar', emoji: '🪐', image: '' }, cardB: { text: 'Sistema Solar', emoji: '🪐', image: '' } },
+                { id: 2, cardA: { text: 'Átomo y Energía', emoji: '⚛️', image: '' }, cardB: { text: 'Átomo y Energía', emoji: '⚛️', image: '' } },
+                { id: 3, cardA: { text: 'Microscopio', emoji: '🔬', image: '' }, cardB: { text: 'Microscopio', emoji: '🔬', image: '' } },
+                { id: 4, cardA: { text: 'Cadena de ADN', emoji: '🧬', image: '' }, cardB: { text: 'Cadena de ADN', emoji: '🧬', image: '' } },
+                { id: 5, cardA: { text: 'Geografía Global', emoji: '🌍', image: '' }, cardB: { text: 'Geografía Global', emoji: '🌍', image: '' } },
+                { id: 6, cardA: { text: 'Volcán Activo', emoji: '🌋', image: '' }, cardB: { text: 'Volcán Activo', emoji: '🌋', image: '' } },
+                { id: 7, cardA: { text: 'Arte y Pintura', emoji: '🎨', image: '' }, cardB: { text: 'Arte y Pintura', emoji: '🎨', image: '' } },
+                { id: 8, cardA: { text: 'Música Clásica', emoji: '🎼', image: '' }, cardB: { text: 'Música Clásica', emoji: '🎼', image: '' } },
+                { id: 9, cardA: { text: 'Literatura', emoji: '📚', image: '' }, cardB: { text: 'Literatura', emoji: '📚', image: '' } },
+                { id: 10, cardA: { text: 'Matemáticas', emoji: '📐', image: '' }, cardB: { text: 'Matemáticas', emoji: '📐', image: '' } },
+                { id: 11, cardA: { text: 'Computación', emoji: '💻', image: '' }, cardB: { text: 'Computación', emoji: '💻', image: '' } },
+                { id: 12, cardA: { text: 'Robótica e IA', emoji: '🤖', image: '' }, cardB: { text: 'Robótica e IA', emoji: '🤖', image: '' } },
+                { id: 13, cardA: { text: 'Ecología Verde', emoji: '🌱', image: '' }, cardB: { text: 'Ecología Verde', emoji: '🌱', image: '' } },
+                { id: 14, cardA: { text: 'Astronomía', emoji: '🔭', image: '' }, cardB: { text: 'Astronomía', emoji: '🔭', image: '' } },
+                { id: 15, cardA: { text: 'Química', emoji: '🧪', image: '' }, cardB: { text: 'Química', emoji: '🧪', image: '' } },
+                { id: 16, cardA: { text: 'Historia Antigua', emoji: '🏛️', image: '' }, cardB: { text: 'Historia Antigua', emoji: '🏛️', image: '' } }
+            ]
+        };
+
+        // =====================================================================
+        // 2. CONFIGURACIÓN DE FIREBASE FIRESTORE (PROYECTO MEMORAMA DE INGLÉS)
+        // =====================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyD44w-VOxoOHiTfW5dIX41jdPVa0ypaRmg",
+            authDomain: "memorama-de-ingles.firebaseapp.com",
+            projectId: "memorama-de-ingles",
+            storageBucket: "memorama-de-ingles.firebasestorage.app",
+            messagingSenderId: "63125947567",
+            appId: "1:63125947567:web:af2aef270b844434c6805a",
+            measurementId: "G-49VFHQEGMF"
+        };
+
+        const COLLECTION_NAME = 'memoramas_salon';
+        const LOCAL_BACKUP_KEY = 'memorama_salon_backup_v1';
+
+        let db = null;
+        let isCloudReady = false;
+        let isLoadingDecks = true;
+
+        function loadLocalBackupDecks() {
+            try {
+                const raw = localStorage.getItem(LOCAL_BACKUP_KEY);
+                if (!raw) return [];
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveLocalBackupDecks(decksArray) {
+            try {
+                localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(decksArray));
+            } catch (e) {
+                // Ignorar si localStorage excede cuota
+            }
+        }
+
+        function initFirebaseCloud() {
+            // Cargar respaldo local inmediato mientras responde Firestore
+            customDecks = loadLocalBackupDecks();
+            updateDeckSelectorUI();
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                isCloudReady = true;
+                subscribeToClassroomDecks();
+            } catch (error) {
+                console.error('Error iniciando Firebase Firestore:', error);
+                isLoadingDecks = false;
+                updateCloudSyncBadge('Respaldo local activo', false);
+                updateDeckSelectorUI();
+            }
+        }
+
+        function subscribeToClassroomDecks() {
+            if (!db) return;
+
+            const decksCollectionRef = collection(db, COLLECTION_NAME);
+
+            onSnapshot(
+                decksCollectionRef,
+                (snapshot) => {
+                    const loadedDecks = [];
+                    snapshot.forEach((docSnap) => {
+                        const data = docSnap.data();
+                        if (data && data.title && Array.isArray(data.pairs)) {
+                            let sortTimestamp = 0;
+                            if (data.updatedAt && typeof data.updatedAt.toMillis === 'function') {
+                                sortTimestamp = data.updatedAt.toMillis();
+                            } else if (typeof data.updatedAtClient === 'number') {
+                                sortTimestamp = data.updatedAtClient;
+                            }
+
+                            loadedDecks.push({
+                                id: docSnap.id,
+                                title: data.title,
+                                author: data.author || 'Compañero del Salón',
+                                description: data.description || '',
+                                isDefault: false,
+                                sortTimestamp,
+                                pairs: data.pairs
+                            });
+                        }
+                    });
+
+                    // Ordenar del más reciente al más antiguo
+                    loadedDecks.sort((a, b) => (b.sortTimestamp || 0) - (a.sortTimestamp || 0));
+                    customDecks = loadedDecks;
+                    isLoadingDecks = false;
+                    isCloudReady = true;
+
+                    // Guardar copia local de respaldo automático
+                    saveLocalBackupDecks(loadedDecks);
+
+                    // Si el mazo activo fue eliminado desde otro dispositivo, volver al predeterminado
+                    if (activeDeckId !== DEFAULT_DECK.id && !customDecks.some(d => d.id === activeDeckId)) {
+                        activeDeckId = DEFAULT_DECK.id;
+                        resetGame();
+                    }
+
+                    updateCloudSyncBadge('Conectado en vivo', true);
+                    updateDeckSelectorUI();
+                    renderDecksManagerList();
+                },
+                (error) => {
+                    console.error('Error escuchando memoramas_salon:', error);
+                    isLoadingDecks = false;
+                    isCloudReady = false;
+                    updateCloudSyncBadge('Modo sin conexión (respaldo)', false);
+                    showToast('Usando respaldo local. Verifica tus reglas de Firestore si no sincroniza.', 'info');
+                }
+            );
+        }
+
+        function updateCloudSyncBadge(label, isConnected) {
+            const badge = document.getElementById('cloud-sync-badge');
+            if (!badge) return;
+            if (isConnected) {
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300';
+                badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>${escapeHTML(label)}`;
+            } else {
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300';
+                badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>${escapeHTML(label)}`;
+            }
+        }
+
+        // =====================================================================
+        // 3. ESTADO GLOBAL DEL JUEGO Y APLICACIÓN
+        // =====================================================================
+        let customDecks = [];
+        let activeDeckId = DEFAULT_DECK.id;
+
+        // Estado de la partida actual
+        let cards = [];
+        let flippedCards = [];
+        let matchedPairsCount = 0;
+        let totalPairsCount = 16;
+        let moves = 0;
+        let timerSeconds = 0;
+        let timerInterval = null;
+        let gameStarted = false;
+        let isLocked = false;
+        let soundEnabled = true;
+
+        // Estado del editor de mazos
+        let editingDeckId = null;
+        let editorPairsData = [];
+        let activeCardMenu = null; // { index, side, mode: 'menu' | 'text' | 'url' }
+        let pendingDeleteDeckId = null;
+        let isDarkTheme = false;
+
+        // =====================================================================
+        // 4. EFECTOS DE SONIDO (WEB AUDIO API SIN ARCHIVOS EXTERNOS)
+        // =====================================================================
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function playTone(freq, duration, startTimeOffset = 0, type = 'sine', gainValue = 0.12) {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            const now = ctx.currentTime + startTimeOffset;
+
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, now);
+
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.exponentialRampToValueAtTime(gainValue, now + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start(now);
+            osc.stop(now + duration + 0.02);
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                if (type === 'flip') {
+                    playTone(523.25, 0.09, 0, 'sine', 0.1);
+                } else if (type === 'match') {
+                    playTone(659.25, 0.14, 0, 'triangle', 0.13);
+                    playTone(783.99, 0.14, 0.08, 'triangle', 0.13);
+                    playTone(1046.5, 0.25, 0.16, 'triangle', 0.14);
+                } else if (type === 'mismatch') {
+                    playTone(293.66, 0.14, 0, 'sine', 0.1);
+                    playTone(261.63, 0.18, 0.1, 'sine', 0.1);
+                } else if (type === 'win') {
+                    playTone(523.25, 0.15, 0, 'triangle', 0.14);
+                    playTone(659.25, 0.15, 0.1, 'triangle', 0.14);
+                    playTone(783.99, 0.15, 0.2, 'triangle', 0.14);
+                    playTone(1046.5, 0.4, 0.3, 'triangle', 0.16);
+                }
+            } catch (e) {
+                // Ignorar restricciones de audio antes de interacción
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('icon-sound-on').classList.toggle('hidden', !soundEnabled);
+            document.getElementById('icon-sound-off').classList.toggle('hidden', soundEnabled);
+            showToast(soundEnabled ? 'Sonido activado' : 'Sonido silenciado', 'info');
+        }
+
+        // =====================================================================
+        // 5. TEMA CLARO / OSCURO Y NOTIFICACIONES TOAST
+        // =====================================================================
+        function initTheme() {
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            isDarkTheme = prefersDark;
+            applyTheme(isDarkTheme);
+        }
+
+        function applyTheme(isDark) {
+            const html = document.documentElement;
+            if (isDark) {
+                html.classList.add('dark');
+                document.getElementById('icon-sun').classList.remove('hidden');
+                document.getElementById('icon-moon').classList.add('hidden');
+            } else {
+                html.classList.remove('dark');
+                document.getElementById('icon-sun').classList.add('hidden');
+                document.getElementById('icon-moon').classList.remove('hidden');
+            }
+        }
+
+        function toggleTheme() {
+            isDarkTheme = !isDarkTheme;
+            applyTheme(isDarkTheme);
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = {
+                success: 'bg-emerald-600 text-white border-emerald-500',
+                error: 'bg-rose-600 text-white border-rose-500',
+                info: 'bg-slate-800 dark:bg-slate-700 text-white border-slate-700'
+            };
+
+            toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium transform transition-all duration-300 translate-y-4 opacity-0 ${colors[type] || colors.info}`;
+            toast.innerHTML = `<span class="flex-1">${escapeHTML(message)}</span>`;
+            
+            container.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-4', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-4', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3400);
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // =====================================================================
+        // 6. SELECTOR DE MAZOS Y REFERENCIAS
+        // =====================================================================
+        function getAllDecks() {
+            return [DEFAULT_DECK, ...customDecks];
+        }
+
+        function getActiveDeck() {
+            return getAllDecks().find(d => d.id === activeDeckId) || DEFAULT_DECK;
+        }
+
+        function updateDeckSelectorUI() {
+            const selector = document.getElementById('deck-selector');
+            const allDecks = getAllDecks();
+            
+            selector.innerHTML = allDecks.map(deck => {
+                const count = deck.pairs.length;
+                const authorLabel = deck.author ? ` — ${deck.author}` : '';
+                return `<option value="${escapeHTML(deck.id)}" ${deck.id === activeDeckId ? 'selected' : ''}>
+                    ${escapeHTML(deck.title)} (${count} pares)${escapeHTML(authorLabel)}
+                </option>`;
+            }).join('');
+
+            document.getElementById('deck-count-badge').textContent = allDecks.length;
+
+            const current = getActiveDeck();
+            const btnEdit = document.getElementById('btn-edit-deck');
+            if (current.isDefault) {
+                btnEdit.classList.add('hidden');
+            } else {
+                btnEdit.classList.remove('hidden');
+            }
+
+            document.getElementById('active-deck-author').textContent = `Por: ${current.author || 'Anónimo'}`;
+            document.getElementById('active-deck-desc').textContent = current.description || `${current.pairs.length} pares personalizados`;
+        }
+
+        function handleDeckChange(deckId) {
+            activeDeckId = deckId;
+            updateDeckSelectorUI();
+            resetGame();
+        }
+
+        function editCurrentDeck() {
+            const current = getActiveDeck();
+            if (!current.isDefault) {
+                openEditorModal(current.id);
+            }
+        }
+
+        // =====================================================================
+        // 7. LÓGICA PRINCIPAL DEL JUEGO DE MEMORAMA
+        // =====================================================================
+        function resetGame() {
+            stopTimer();
+            timerSeconds = 0;
+            moves = 0;
+            matchedPairsCount = 0;
+            flippedCards = [];
+            gameStarted = false;
+            isLocked = false;
+
+            const deck = getActiveDeck();
+            totalPairsCount = deck.pairs.length;
+
+            document.getElementById('stat-pairs').textContent = '0';
+            document.getElementById('stat-total-pairs').textContent = totalPairsCount;
+            document.getElementById('stat-moves').textContent = '0';
+            document.getElementById('stat-timer').textContent = '00:00';
+            updateProgressBar();
+
+            const deckCards = [];
+            deck.pairs.forEach((pair, index) => {
+                const pairKey = `pair-${index}`;
+                deckCards.push({
+                    uid: `${pairKey}-A`,
+                    pairKey: pairKey,
+                    side: 'A',
+                    text: pair.cardA.text || '',
+                    emoji: pair.cardA.emoji || '',
+                    image: pair.cardA.image || '',
+                    matched: false
+                });
+                deckCards.push({
+                    uid: `${pairKey}-B`,
+                    pairKey: pairKey,
+                    side: 'B',
+                    text: pair.cardB.text || '',
+                    emoji: pair.cardB.emoji || '',
+                    image: pair.cardB.image || '',
+                    matched: false
+                });
+            });
+
+            cards = shuffleArray(deckCards);
+            renderBoard();
+        }
+
+        function shuffleArray(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function getResponsiveGridClasses(totalCards) {
+            if (totalCards <= 2) {
+                return 'grid-cols-2 max-w-md';
+            } else if (totalCards <= 6) {
+                return 'grid-cols-2 sm:grid-cols-3 max-w-2xl';
+            } else if (totalCards <= 12) {
+                return 'grid-cols-3 sm:grid-cols-4 max-w-3xl';
+            } else if (totalCards <= 16) {
+                return 'grid-cols-4 max-w-4xl';
+            } else if (totalCards <= 20) {
+                return 'grid-cols-4 sm:grid-cols-5 max-w-5xl';
+            } else if (totalCards <= 24) {
+                return 'grid-cols-4 sm:grid-cols-6 max-w-6xl';
+            } else {
+                return 'grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 max-w-7xl';
+            }
+        }
+
+        function renderBoard() {
+            const board = document.getElementById('game-board');
+            const totalCards = cards.length;
+            const gridClasses = getResponsiveGridClasses(totalCards);
+
+            board.className = `grid gap-2.5 sm:gap-3.5 w-full mx-auto ${gridClasses}`;
+
+            board.innerHTML = cards.map((card, index) => {
+                const hasImage = Boolean(card.image && card.image.trim() !== '');
+                const hasEmoji = Boolean(card.emoji && card.emoji.trim() !== '');
+                const hasText = Boolean(card.text && card.text.trim() !== '');
+
+                let frontContentHTML = '';
+                if (hasImage && hasText) {
+                    frontContentHTML = `
+                        <div class="w-full h-full flex flex-col items-center justify-between p-1.5 sm:p-2 overflow-hidden">
+                            <div class="w-full flex-1 min-h-0 flex items-center justify-center overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800/80">
+                                <img src="${escapeHTML(card.image)}" alt="${escapeHTML(card.text)}" onerror="this.style.display='none'" class="w-full h-full object-contain">
+                            </div>
+                            <span class="mt-1 text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-100 text-center leading-tight line-clamp-2 w-full px-0.5">
+                                ${escapeHTML(card.text)}
+                            </span>
+                        </div>
+                    `;
+                } else if (hasImage) {
+                    frontContentHTML = `
+                        <div class="w-full h-full p-1.5 sm:p-2 flex items-center justify-center overflow-hidden">
+                            <img src="${escapeHTML(card.image)}" alt="Tarjeta" onerror="this.src='https://placehold.co/200x200/e2e8f0/475569?text=Imagen'" class="w-full h-full object-contain rounded-lg">
+                        </div>
+                    `;
+                } else if (hasEmoji && hasText) {
+                    frontContentHTML = `
+                        <div class="w-full h-full flex flex-col items-center justify-center p-2 text-center gap-1">
+                            <span class="text-2xl sm:text-3xl md:text-4xl select-none leading-none">${escapeHTML(card.emoji)}</span>
+                            <span class="text-[11px] sm:text-xs font-bold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2">
+                                ${escapeHTML(card.text)}
+                            </span>
+                        </div>
+                    `;
+                } else if (hasEmoji) {
+                    frontContentHTML = `
+                        <div class="w-full h-full flex items-center justify-center p-2">
+                            <span class="text-3xl sm:text-4xl md:text-5xl select-none">${escapeHTML(card.emoji)}</span>
+                        </div>
+                    `;
+                } else {
+                    const textLen = card.text.length;
+                    const textSizeClass = textLen > 35 ? 'text-[10px] sm:text-xs' : (textLen > 16 ? 'text-xs sm:text-sm' : 'text-sm sm:text-base');
+                    frontContentHTML = `
+                        <div class="w-full h-full flex items-center justify-center p-2.5 text-center overflow-y-auto">
+                            <span class="${textSizeClass} font-bold text-slate-800 dark:text-slate-100 leading-snug break-words">
+                                ${escapeHTML(card.text || 'Sin contenido')}
+                            </span>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div id="card-${index}" onclick="handleCardClick(${index})" class="perspective-1000 aspect-[3/4] sm:aspect-square cursor-pointer select-none group">
+                        <div class="card-inner relative w-full h-full transform-style-3d rounded-2xl shadow-sm group-hover:shadow-md transition-shadow">
+                            
+                            <!-- Reverso de la tarjeta (Boca abajo) -->
+                            <div class="backface-hidden absolute inset-0 rounded-2xl bg-gradient-to-br from-brand-500 via-brand-600 to-violet-700 card-pattern border-2 border-white/20 flex items-center justify-center">
+                                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/15 backdrop-blur-xs flex items-center justify-center text-white/90 font-bold text-sm sm:text-base shadow-inner">
+                                    ?
+                                </div>
+                            </div>
+
+                            <!-- Anverso de la tarjeta (Boca arriba) -->
+                            <div class="backface-hidden rotate-y-180 absolute inset-0 rounded-2xl bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden">
+                                ${frontContentHTML}
+                            </div>
+
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function handleCardClick(index) {
+            if (isLocked) return;
+            const card = cards[index];
+            if (!card || card.matched) return;
+            if (flippedCards.includes(index)) return;
+
+            if (!gameStarted) {
+                gameStarted = true;
+                startTimer();
+            }
+
+            playSound('flip');
+            flipCardUI(index, true);
+            flippedCards.push(index);
+
+            if (flippedCards.length === 2) {
+                moves++;
+                document.getElementById('stat-moves').textContent = moves;
+                checkForMatch();
+            }
+        }
+
+        function flipCardUI(index, showFront) {
+            const cardEl = document.getElementById(`card-${index}`);
+            if (!cardEl) return;
+            const inner = cardEl.querySelector('.card-inner');
+            if (showFront) {
+                inner.classList.add('rotate-y-180');
+            } else {
+                inner.classList.remove('rotate-y-180');
+            }
+        }
+
+        function checkForMatch() {
+            const [idx1, idx2] = flippedCards;
+            const card1 = cards[idx1];
+            const card2 = cards[idx2];
+
+            if (card1.pairKey === card2.pairKey) {
+                card1.matched = true;
+                card2.matched = true;
+                matchedPairsCount++;
+                flippedCards = [];
+
+                playSound('match');
+
+                const el1 = document.getElementById(`card-${idx1}`);
+                const el2 = document.getElementById(`card-${idx2}`);
+                if (el1 && el2) {
+                    el1.classList.add('card-matched');
+                    el2.classList.add('card-matched');
+                    el1.querySelector('.rotate-y-180').classList.add('border-emerald-400', 'dark:border-emerald-500', 'bg-emerald-50/40', 'dark:bg-emerald-950/30');
+                    el2.querySelector('.rotate-y-180').classList.add('border-emerald-400', 'dark:border-emerald-500', 'bg-emerald-50/40', 'dark:bg-emerald-950/30');
+                }
+
+                document.getElementById('stat-pairs').textContent = matchedPairsCount;
+                updateProgressBar();
+
+                if (matchedPairsCount === totalPairsCount) {
+                    handleGameWin();
+                }
+            } else {
+                isLocked = true;
+                playSound('mismatch');
+
+                const el1 = document.getElementById(`card-${idx1}`);
+                const el2 = document.getElementById(`card-${idx2}`);
+
+                setTimeout(() => {
+                    if (el1) el1.classList.add('card-mismatch');
+                    if (el2) el2.classList.add('card-mismatch');
+                }, 250);
+
+                setTimeout(() => {
+                    if (el1) el1.classList.remove('card-mismatch');
+                    if (el2) el2.classList.remove('card-mismatch');
+                    flipCardUI(idx1, false);
+                    flipCardUI(idx2, false);
+                    flippedCards = [];
+                    isLocked = false;
+                }, 900);
+            }
+        }
+
+        function updateProgressBar() {
+            const pct = totalPairsCount > 0 ? Math.round((matchedPairsCount / totalPairsCount) * 100) : 0;
+            document.getElementById('progress-bar').style.width = `${pct}%`;
+            document.getElementById('progress-percentage').textContent = `${pct}%`;
+        }
+
+        // =====================================================================
+        // 8. TEMPORIZADOR Y PANTALLA DE VICTORIA
+        // =====================================================================
+        function startTimer() {
+            stopTimer();
+            timerInterval = setInterval(() => {
+                timerSeconds++;
+                document.getElementById('stat-timer').textContent = formatTime(timerSeconds);
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function formatTime(totalSecs) {
+            const mins = Math.floor(totalSecs / 60);
+            const secs = totalSecs % 60;
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function handleGameWin() {
+            stopTimer();
+            playSound('win');
+
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 90,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
+
+            const deck = getActiveDeck();
+            document.getElementById('victory-deck-name').textContent = `Completaste "${deck.title}"`;
+            document.getElementById('victory-pairs').textContent = totalPairsCount;
+            document.getElementById('victory-moves').textContent = moves;
+            document.getElementById('victory-time').textContent = formatTime(timerSeconds);
+
+            const ratio = moves / totalPairsCount;
+            let stars = 3;
+            if (ratio > 2.3) stars = 1;
+            else if (ratio > 1.65) stars = 2;
+
+            const starsContainer = document.getElementById('victory-stars');
+            starsContainer.innerHTML = [1, 2, 3].map(n => 
+                n <= stars 
+                    ? '<span class="text-amber-400 drop-shadow-xs">★</span>' 
+                    : '<span class="text-slate-300 dark:text-slate-700">★</span>'
+            ).join('');
+
+            const modal = document.getElementById('victory-modal');
+            const content = document.getElementById('victory-modal-content');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            requestAnimationFrame(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            });
+        }
+
+        function closeVictoryModal() {
+            const modal = document.getElementById('victory-modal');
+            const content = document.getElementById('victory-modal-content');
+            content.classList.add('scale-95', 'opacity-0');
+            content.classList.remove('scale-100', 'opacity-100');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 200);
+        }
+
+        // =====================================================================
+        // 9. CREADOR / EDITOR DE MEMORAMAS PERSONALIZADOS
+        // =====================================================================
+        function createEmptyPair(index) {
+            return {
+                id: Date.now() + index,
+                cardA: { text: '', emoji: '', image: '' },
+                cardB: { text: '', emoji: '', image: '' }
+            };
+        }
+
+        function openEditorModal(deckIdToEdit) {
+            editingDeckId = deckIdToEdit;
+            activeCardMenu = null;
+            const titleInput = document.getElementById('editor-deck-title');
+            const authorInput = document.getElementById('editor-deck-author');
+            const descInput = document.getElementById('editor-deck-desc');
+            const modalTitle = document.getElementById('editor-modal-title');
+
+            buildPairDropdownMenu();
+
+            if (deckIdToEdit) {
+                const deck = customDecks.find(d => d.id === deckIdToEdit);
+                if (!deck) return;
+                modalTitle.textContent = 'Editar Memorama del Salón';
+                titleInput.value = deck.title;
+                authorInput.value = deck.author || '';
+                descInput.value = deck.description || '';
+                editorPairsData = JSON.parse(JSON.stringify(deck.pairs)).slice(0, 16);
+            } else {
+                modalTitle.textContent = 'Crear Memorama Personalizado';
+                titleInput.value = '';
+                authorInput.value = '';
+                descInput.value = '';
+                const initialCount = 8;
+                editorPairsData = Array.from({ length: initialCount }, (_, i) => createEmptyPair(i));
+            }
+
+            updatePairDropdownUI();
+            renderEditorPairsList();
+            updateEditorSizeIndicator();
+
+            const modal = document.getElementById('editor-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeEditorModal() {
+            closePairDropdown();
+            activeCardMenu = null;
+            const modal = document.getElementById('editor-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function buildPairDropdownMenu() {
+            const menu = document.getElementById('pair-dropdown-menu');
+            let html = '';
+            for (let i = 1; i <= 16; i++) {
+                const label = i === 1 ? '1 par (2 cartas)' : `${i} pares (${i * 2} cartas)`;
+                html += `
+                    <button type="button" onclick="selectPairCount(${i})" data-pair-opt="${i}" class="w-full text-left px-3.5 py-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-brand-50 dark:hover:bg-brand-950/60 hover:text-brand-600 dark:hover:text-brand-400 flex items-center justify-between transition-colors">
+                        <span>${label}</span>
+                        <span class="check-icon hidden text-brand-600 dark:text-brand-400 font-bold">✓</span>
+                    </button>
+                `;
+            }
+            menu.innerHTML = html;
+        }
+
+        function togglePairDropdown(event) {
+            if (event) event.stopPropagation();
+            const menu = document.getElementById('pair-dropdown-menu');
+            const chevron = document.getElementById('pair-dropdown-chevron');
+            const isHidden = menu.classList.contains('hidden');
+            if (isHidden) {
+                menu.classList.remove('hidden');
+                chevron.classList.add('rotate-180');
+            } else {
+                closePairDropdown();
+            }
+        }
+
+        function closePairDropdown() {
+            const menu = document.getElementById('pair-dropdown-menu');
+            const chevron = document.getElementById('pair-dropdown-chevron');
+            if (menu) menu.classList.add('hidden');
+            if (chevron) chevron.classList.remove('rotate-180');
+        }
+
+        function selectPairCount(count) {
+            const targetCount = Math.min(16, Math.max(1, parseInt(count, 10) || 1));
+            closePairDropdown();
+            syncEditorPairsArray(targetCount);
+            updatePairDropdownUI();
+        }
+
+        function updatePairDropdownUI() {
+            const count = editorPairsData.length;
+            const labelEl = document.getElementById('pair-dropdown-label');
+            if (labelEl) {
+                labelEl.textContent = count === 1 ? '1 par' : `${count} pares`;
+            }
+            document.querySelectorAll('#pair-dropdown-menu [data-pair-opt]').forEach(btn => {
+                const optVal = parseInt(btn.getAttribute('data-pair-opt'), 10);
+                const check = btn.querySelector('.check-icon');
+                if (optVal === count) {
+                    btn.classList.add('bg-brand-50/80', 'dark:bg-brand-950/50', 'text-brand-600', 'dark:text-brand-400', 'font-bold');
+                    if (check) check.classList.remove('hidden');
+                } else {
+                    btn.classList.remove('bg-brand-50/80', 'dark:bg-brand-950/50', 'text-brand-600', 'dark:text-brand-400', 'font-bold');
+                    if (check) check.classList.add('hidden');
+                }
+            });
+        }
+
+        function syncEditorPairsArray(targetCount) {
+            if (targetCount > editorPairsData.length) {
+                const toAdd = targetCount - editorPairsData.length;
+                for (let i = 0; i < toAdd; i++) {
+                    editorPairsData.push(createEmptyPair(editorPairsData.length + i));
+                }
+            } else if (targetCount < editorPairsData.length) {
+                editorPairsData = editorPairsData.slice(0, targetCount);
+            }
+            activeCardMenu = null;
+            renderEditorPairsList();
+            updateEditorSizeIndicator();
+        }
+
+        function removeSpecificPair(index) {
+            if (editorPairsData.length <= 1) {
+                showToast('El memorama debe tener al menos 1 par.', 'error');
+                return;
+            }
+            editorPairsData.splice(index, 1);
+            activeCardMenu = null;
+            updatePairDropdownUI();
+            renderEditorPairsList();
+            updateEditorSizeIndicator();
+        }
+
+        function copyCardAToB(index) {
+            const pair = editorPairsData[index];
+            if (!pair) return;
+            pair.cardB = {
+                text: pair.cardA.text,
+                emoji: pair.cardA.emoji,
+                image: pair.cardA.image
+            };
+            activeCardMenu = null;
+            renderEditorPairsList();
+            updateEditorSizeIndicator();
+            showToast(`Tarjeta A copiada a la B en el Par #${index + 1}`, 'info');
+        }
+
+        function openCardPlusMenu(index, side, mode = 'menu') {
+            activeCardMenu = { index, side, mode };
+            renderEditorPairsList();
+            if (mode === 'text') {
+                setTimeout(() => {
+                    const input = document.getElementById(`card-input-text-${index}-${side}`);
+                    if (input) input.focus();
+                }, 20);
+            } else if (mode === 'url') {
+                setTimeout(() => {
+                    const input = document.getElementById(`card-input-url-${index}-${side}`);
+                    if (input) input.focus();
+                }, 20);
+            }
+        }
+
+        function closeCardPlusMenu() {
+            activeCardMenu = null;
+            renderEditorPairsList();
+        }
+
+        function triggerCardFilePicker(index, side) {
+            const fileInput = document.getElementById(`card-file-${index}-${side}`);
+            if (fileInput) fileInput.click();
+        }
+
+        function saveCardInlineInput(index, side, field) {
+            const input = document.getElementById(`card-input-${field === 'text' ? 'text' : 'url'}-${index}-${side}`);
+            if (input && editorPairsData[index]) {
+                editorPairsData[index][side][field] = input.value.trim();
+            }
+            activeCardMenu = null;
+            renderEditorPairsList();
+            updateEditorSizeIndicator();
+        }
+
+        function clearCardContent(index, side) {
+            if (!editorPairsData[index]) return;
+            editorPairsData[index][side] = { text: '', emoji: '', image: '' };
+            activeCardMenu = null;
+            renderEditorPairsList();
+            updateEditorSizeIndicator();
+        }
+
+        function estimateDeckSizeBytes(pairsArr) {
+            try {
+                return new Blob([JSON.stringify(pairsArr)]).size;
+            } catch (e) {
+                return JSON.stringify(pairsArr).length;
+            }
+        }
+
+        function updateEditorSizeIndicator() {
+            const indicator = document.getElementById('editor-size-indicator');
+            if (!indicator) return;
+            const bytes = estimateDeckSizeBytes(editorPairsData);
+            const kb = Math.max(1, Math.round(bytes / 1024));
+            const maxKb = 950;
+            if (kb > maxKb) {
+                indicator.className = 'font-bold text-rose-600 dark:text-rose-400';
+                indicator.textContent = `Peso excedido: ${kb} KB / ${maxKb} KB (usa menos fotos)`;
+            } else if (kb > 700) {
+                indicator.className = 'font-semibold text-amber-600 dark:text-amber-400';
+                indicator.textContent = `Peso estimado: ${kb} KB / ${maxKb} KB`;
+            } else {
+                indicator.className = 'font-semibold text-slate-600 dark:text-slate-300';
+                indicator.textContent = `Peso estimado: ${kb} KB / ${maxKb} KB`;
+            }
+        }
+
+        // Compresión automática Canvas (máx 320px, calidad 0.65) para mantener el documento bajo el límite de 1 MB de Firestore
+        function handleImageUpload(event, index, side) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                showToast('Por favor selecciona un archivo de imagen válido.', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_SIZE = 320;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_SIZE) {
+                            height = Math.round((height * MAX_SIZE) / width);
+                            width = MAX_SIZE;
+                        }
+                    } else {
+                        if (height > MAX_SIZE) {
+                            width = Math.round((width * MAX_SIZE) / height);
+                            height = MAX_SIZE;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
+                    editorPairsData[index][side].image = compressedDataUrl;
+                    activeCardMenu = null;
+                    renderEditorPairsList();
+                    updateEditorSizeIndicator();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function renderEditorPairsList() {
+            const container = document.getElementById('editor-pairs-list');
+            container.innerHTML = editorPairsData.map((pair, idx) => {
+                return `
+                    <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-3.5 sm:p-4 shadow-xs flex flex-col gap-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-lg bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 font-bold text-xs flex items-center justify-center">
+                                    ${idx + 1}
+                                </span>
+                                <span class="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-100">Par #${idx + 1}</span>
+                            </div>
+
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" onclick="copyCardAToB(${idx})" title="Hacer que la Tarjeta B sea igual a la Tarjeta A" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-brand-500 text-slate-600 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 text-[11px] font-semibold transition-colors">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                    <span>Copiar A → B</span>
+                                </button>
+                                <button type="button" onclick="removeSpecificPair(${idx})" title="Eliminar este par" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            ${renderVisualCardEditor(idx, 'cardA', 'Tarjeta A', pair.cardA)}
+                            ${renderVisualCardEditor(idx, 'cardB', 'Tarjeta B', pair.cardB)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderVisualCardEditor(index, side, label, data) {
+            const hasImg = Boolean(data.image && data.image.trim() !== '');
+            const hasText = Boolean(data.text && data.text.trim() !== '');
+            const hasEmoji = Boolean(data.emoji && data.emoji.trim() !== '');
+            const isEmpty = !hasImg && !hasText && !hasEmoji;
+
+            const isMenuOpen = activeCardMenu && activeCardMenu.index === index && activeCardMenu.side === side;
+            const menuMode = isMenuOpen ? activeCardMenu.mode : null;
+
+            const hiddenFileInput = `<input type="file" id="card-file-${index}-${side}" accept="image/*" onchange="handleImageUpload(event, ${index}, '${side}')" class="hidden">`;
+
+            let overlayHTML = '';
+            if (isMenuOpen) {
+                if (menuMode === 'menu') {
+                    overlayHTML = `
+                        <div class="absolute inset-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-2xl p-2.5 flex flex-col justify-between border-2 border-brand-500">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wide">Añadir a ${label}</span>
+                                <button type="button" onclick="closeCardPlusMenu()" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                            <div class="flex flex-col gap-1.5 my-auto">
+                                <button type="button" onclick="triggerCardFilePicker(${index}, '${side}')" class="w-full py-2 px-2.5 rounded-xl bg-brand-50 dark:bg-brand-950/70 hover:bg-brand-100 dark:hover:bg-brand-900/80 text-brand-700 dark:text-brand-300 text-xs font-semibold flex items-center gap-2 transition-colors">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                    <span>Subir imagen</span>
+                                </button>
+                                <button type="button" onclick="openCardPlusMenu(${index}, '${side}', 'text')" class="w-full py-2 px-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 transition-colors">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                    <span>${hasText ? 'Editar texto' : 'Añadir texto'}</span>
+                                </button>
+                                <button type="button" onclick="openCardPlusMenu(${index}, '${side}', 'url')" class="w-full py-1.5 px-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 text-[11px] font-medium flex items-center gap-2 transition-colors">
+                                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                                    <span>Pegar URL imagen</span>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else if (menuMode === 'text') {
+                    overlayHTML = `
+                        <div class="absolute inset-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-2xl p-3 flex flex-col justify-between border-2 border-brand-500">
+                            <span class="text-[11px] font-bold text-slate-600 dark:text-slate-300">Texto de ${label}</span>
+                            <textarea id="card-input-text-${index}-${side}" rows="3" placeholder="Escribe aquí..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); saveCardInlineInput(${index}, '${side}', 'text');}" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none">${escapeHTML(data.text || '')}</textarea>
+                            <div class="flex items-center justify-end gap-1.5">
+                                <button type="button" onclick="closeCardPlusMenu()" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                                <button type="button" onclick="saveCardInlineInput(${index}, '${side}', 'text')" class="px-3 py-1 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-semibold">Listo</button>
+                            </div>
+                        </div>
+                    `;
+                } else if (menuMode === 'url') {
+                    const currentUrl = (data.image && !data.image.startsWith('data:')) ? data.image : '';
+                    overlayHTML = `
+                        <div class="absolute inset-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-2xl p-3 flex flex-col justify-between border-2 border-brand-500">
+                            <span class="text-[11px] font-bold text-slate-600 dark:text-slate-300">Enlace de imagen</span>
+                            <input type="url" id="card-input-url-${index}-${side}" value="${escapeHTML(currentUrl)}" placeholder="https://..." onkeydown="if(event.key==='Enter'){event.preventDefault(); saveCardInlineInput(${index}, '${side}', 'image');}" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-2 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <div class="flex items-center justify-end gap-1.5">
+                                <button type="button" onclick="closeCardPlusMenu()" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                                <button type="button" onclick="saveCardInlineInput(${index}, '${side}', 'image')" class="px-3 py-1 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-semibold">Listo</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            if (isEmpty) {
+                return `
+                    <div class="relative aspect-[4/5] rounded-2xl bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-brand-400 dark:hover:border-brand-500 transition-colors flex flex-col items-center justify-center p-3 group">
+                        ${hiddenFileInput}
+                        <span class="absolute top-2.5 left-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">${label}</span>
+                        <button type="button" onclick="openCardPlusMenu(${index}, '${side}', 'menu')" title="Añadir imagen o texto" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-brand-50 dark:bg-brand-950/70 group-hover:bg-brand-600 text-brand-600 dark:text-brand-400 group-hover:text-white flex items-center justify-center shadow-xs group-hover:shadow-md group-hover:scale-105 transition-all">
+                            <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                            </svg>
+                        </button>
+                        ${overlayHTML}
+                    </div>
+                `;
+            }
+
+            let contentPreview = '';
+            if (hasImg && hasText) {
+                contentPreview = `
+                    <div class="w-full flex-1 min-h-0 flex items-center justify-center overflow-hidden rounded-xl bg-slate-50 dark:bg-slate-800/60 p-1">
+                        <img src="${escapeHTML(data.image)}" alt="Vista previa" class="w-full h-full object-contain rounded-lg">
+                    </div>
+                    <p class="mt-1.5 text-xs font-bold text-slate-800 dark:text-slate-100 text-center line-clamp-2 leading-tight px-1">${escapeHTML(data.text)}</p>
+                `;
+            } else if (hasImg) {
+                contentPreview = `
+                    <div class="w-full h-full flex items-center justify-center overflow-hidden rounded-xl bg-slate-50 dark:bg-slate-800/60 p-1">
+                        <img src="${escapeHTML(data.image)}" alt="Vista previa" class="w-full h-full object-contain rounded-lg">
+                    </div>
+                `;
+            } else {
+                contentPreview = `
+                    <div class="w-full h-full flex flex-col items-center justify-center text-center p-2 overflow-y-auto">
+                        ${hasEmoji ? `<span class="text-3xl mb-1">${escapeHTML(data.emoji)}</span>` : ''}
+                        <span class="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 leading-snug break-words">${escapeHTML(data.text)}</span>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="relative aspect-[4/5] rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 shadow-xs flex flex-col justify-between p-2.5 pt-7 overflow-hidden group">
+                    ${hiddenFileInput}
+                    <div class="absolute top-1.5 inset-x-2 flex items-center justify-between z-10">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-white/80 dark:bg-slate-900/80 px-1.5 py-0.5 rounded-md">${label}</span>
+                        <div class="flex items-center gap-1">
+                            <button type="button" onclick="openCardPlusMenu(${index}, '${side}', 'menu')" title="Editar o añadir más contenido" class="p-1 rounded-lg bg-slate-100/90 dark:bg-slate-800/90 hover:bg-brand-100 dark:hover:bg-brand-900 text-slate-600 dark:text-slate-300 hover:text-brand-600 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
+                            <button type="button" onclick="clearCardContent(${index}, '${side}')" title="Vaciar tarjeta" class="p-1 rounded-lg bg-slate-100/90 dark:bg-slate-800/90 hover:bg-rose-100 dark:hover:bg-rose-950 text-slate-500 hover:text-rose-600 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    ${contentPreview}
+                    ${overlayHTML}
+                </div>
+            `;
+        }
+
+        async function saveCustomDeck() {
+            const title = document.getElementById('editor-deck-title').value.trim();
+            const author = document.getElementById('editor-deck-author').value.trim() || 'Compañero del Salón';
+            const description = document.getElementById('editor-deck-desc').value.trim();
+
+            if (!title) {
+                showToast('Por favor escribe un nombre para el memorama (ej. Orientación).', 'error');
+                document.getElementById('editor-deck-title').focus();
+                return;
+            }
+
+            for (let i = 0; i < editorPairsData.length; i++) {
+                const p = editorPairsData[i];
+                const validA = (p.cardA.text && p.cardA.text.trim()) || (p.cardA.image && p.cardA.image.trim()) || (p.cardA.emoji && p.cardA.emoji.trim());
+                const validB = (p.cardB.text && p.cardB.text.trim()) || (p.cardB.image && p.cardB.image.trim()) || (p.cardB.emoji && p.cardB.emoji.trim());
+
+                if (!validA || !validB) {
+                    showToast(`El Par #${i + 1} está incompleto. Haz clic en "+" para llenar ambas tarjetas.`, 'error');
+                    return;
+                }
+            }
+
+            const totalBytes = estimateDeckSizeBytes(editorPairsData);
+            if (totalBytes > 950 * 1024) {
+                showToast('El mazo pesa más de 950 KB (límite 1 MB de Firestore). Reduce algunas imágenes o usa enlaces URL.', 'error');
+                return;
+            }
+
+            const saveBtn = document.getElementById('btn-save-deck');
+            if (saveBtn) saveBtn.disabled = true;
+
+            const nowMs = Date.now();
+            const basePayload = {
+                title,
+                author,
+                description,
+                pairCount: editorPairsData.length,
+                updatedAtClient: nowMs,
+                pairs: editorPairsData
+            };
+
+            try {
+                if (db) {
+                    const firestorePayload = {
+                        ...basePayload,
+                        updatedAt: serverTimestamp()
+                    };
+
+                    if (editingDeckId && !editingDeckId.startsWith('local_')) {
+                        const deckDocRef = doc(db, COLLECTION_NAME, editingDeckId);
+                        await updateDoc(deckDocRef, firestorePayload);
+                        activeDeckId = editingDeckId;
+                    } else {
+                        const newDocRef = await addDoc(collection(db, COLLECTION_NAME), firestorePayload);
+                        activeDeckId = newDocRef.id;
+                    }
+
+                    // Actualizar estado local inmediatamente
+                    const existingIdx = customDecks.findIndex(d => d.id === activeDeckId);
+                    const localMirror = { id: activeDeckId, isDefault: false, sortTimestamp: nowMs, ...basePayload };
+                    if (existingIdx !== -1) customDecks[existingIdx] = localMirror;
+                    else customDecks.unshift(localMirror);
+                    saveLocalBackupDecks(customDecks);
+
+                    updateDeckSelectorUI();
+                    closeEditorModal();
+                    resetGame();
+                    showToast(`¡Mazo "${title}" guardado en Firestore! Todo el salón ya puede jugarlo.`, 'success');
+                } else {
+                    throw new Error('Sin instancia de Firestore');
+                }
+            } catch (err) {
+                console.error('Error guardando en Firestore, usando respaldo local:', err);
+                const fallbackId = editingDeckId || `local_${nowMs}`;
+                const existingIdx = customDecks.findIndex(d => d.id === fallbackId);
+                const localDeck = { id: fallbackId, isDefault: false, sortTimestamp: nowMs, ...basePayload };
+                if (existingIdx !== -1) customDecks[existingIdx] = localDeck;
+                else customDecks.unshift(localDeck);
+                saveLocalBackupDecks(customDecks);
+
+                activeDeckId = fallbackId;
+                updateDeckSelectorUI();
+                closeEditorModal();
+                resetGame();
+                showToast(`Guardado en respaldo local (sin conexión a la nube).`, 'info');
+            } finally {
+                if (saveBtn) saveBtn.disabled = false;
+            }
+        }
+
+        // =====================================================================
+        // 10. GESTOR DE MAZOS DEL SALÓN (BUSCAR, JUGAR, EXPORTAR, IMPORTAR, BORRAR)
+        // =====================================================================
+        function openDecksManagerModal() {
+            pendingDeleteDeckId = null;
+            const searchInput = document.getElementById('decks-search-input');
+            if (searchInput) searchInput.value = '';
+            renderDecksManagerList();
+            const modal = document.getElementById('decks-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeDecksManagerModal() {
+            const modal = document.getElementById('decks-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function renderDecksManagerList() {
+            const container = document.getElementById('decks-list-container');
+            if (!container) return;
+
+            const searchInput = document.getElementById('decks-search-input');
+            const queryText = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+            const allDecks = getAllDecks().filter(deck => {
+                if (!queryText) return true;
+                return (
+                    (deck.title && deck.title.toLowerCase().includes(queryText)) ||
+                    (deck.author && deck.author.toLowerCase().includes(queryText)) ||
+                    (deck.description && deck.description.toLowerCase().includes(queryText))
+                );
+            });
+
+            if (isLoadingDecks && customDecks.length === 0) {
+                container.innerHTML = `
+                    <div class="py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                        Cargando memoramas del salón...
+                    </div>
+                `;
+                return;
+            }
+
+            if (allDecks.length === 0) {
+                container.innerHTML = `
+                    <div class="py-10 text-center">
+                        <p class="text-sm font-semibold text-slate-600 dark:text-slate-300">No se encontraron memoramas con "${escapeHTML(queryText)}"</p>
+                        <p class="text-xs text-slate-400 mt-1">Prueba con otro nombre o crea uno nuevo para el salón.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = allDecks.map(deck => {
+                const isSelected = deck.id === activeDeckId;
+                const isConfirmingDelete = pendingDeleteDeckId === deck.id;
+
+                return `
+                    <div class="rounded-2xl border ${isSelected ? 'border-brand-500 bg-brand-50/40 dark:bg-brand-950/30' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'} p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h3 class="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">${escapeHTML(deck.title)}</h3>
+                                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                    ${deck.pairs.length} pares
+                                </span>
+                                ${deck.isDefault ? '<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">Predeterminado</span>' : '<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300">Salón</span>'}
+                                ${isSelected ? '<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-brand-600 text-white">Jugando</span>' : ''}
+                            </div>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                Creado por: <strong class="text-slate-700 dark:text-slate-300">${escapeHTML(deck.author || 'Anónimo')}</strong>
+                                ${deck.description ? ` • ${escapeHTML(deck.description)}` : ''}
+                            </p>
+                        </div>
+
+                        <div class="flex items-center gap-2 flex-wrap shrink-0">
+                            ${!isSelected ? `
+                                <button onclick="selectDeckFromManager('${escapeHTML(deck.id)}')" class="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold transition-colors">
+                                    Jugar
+                                </button>
+                            ` : ''}
+
+                            <button onclick="exportDeckToJSON('${escapeHTML(deck.id)}')" title="Descargar respaldo JSON" class="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                JSON
+                            </button>
+
+                            ${!deck.isDefault ? `
+                                <button onclick="closeDecksManagerModal(); openEditorModal('${escapeHTML(deck.id)}');" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">
+                                    Editar
+                                </button>
+                                ${isConfirmingDelete ? `
+                                    <button onclick="confirmDeleteDeck('${escapeHTML(deck.id)}')" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors">
+                                        ¿Confirmar borrar?
+                                    </button>
+                                ` : `
+                                    <button onclick="requestDeleteDeck('${escapeHTML(deck.id)}')" title="Eliminar mazo" class="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
+                                `}
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectDeckFromManager(deckId) {
+            handleDeckChange(deckId);
+            closeDecksManagerModal();
+        }
+
+        function requestDeleteDeck(deckId) {
+            pendingDeleteDeckId = deckId;
+            renderDecksManagerList();
+        }
+
+        async function confirmDeleteDeck(deckId) {
+            try {
+                if (db && !deckId.startsWith('local_')) {
+                    const deckDocRef = doc(db, COLLECTION_NAME, deckId);
+                    await deleteDoc(deckDocRef);
+                }
+                customDecks = customDecks.filter(d => d.id !== deckId);
+                saveLocalBackupDecks(customDecks);
+                if (activeDeckId === deckId) {
+                    activeDeckId = DEFAULT_DECK.id;
+                    resetGame();
+                }
+                updateDeckSelectorUI();
+                renderDecksManagerList();
+                pendingDeleteDeckId = null;
+                showToast('Mazo eliminado del salón.', 'info');
+            } catch (err) {
+                console.error('Error al eliminar mazo:', err);
+                showToast('No se pudo eliminar el mazo de la nube.', 'error');
+            }
+        }
+
+        function exportDeckToJSON(deckId) {
+            const deck = getAllDecks().find(d => d.id === deckId);
+            if (!deck) return;
+
+            const exportData = {
+                app: 'MemoramaSalon',
+                version: 1,
+                deck: {
+                    title: deck.title,
+                    author: deck.author,
+                    description: deck.description,
+                    pairs: deck.pairs
+                }
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const safeName = deck.title.toLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi, '_').replace(/^_|_$/g, '');
+            a.href = url;
+            a.download = `memorama_${safeName || 'personalizado'}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast('Archivo JSON descargado.', 'success');
+        }
+
+        function importDeckFromJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    const incoming = parsed.deck ? parsed.deck : parsed;
+
+                    if (!incoming || !incoming.title || !Array.isArray(incoming.pairs) || incoming.pairs.length < 1) {
+                        throw new Error('Formato inválido');
+                    }
+
+                    const cleanedPairs = incoming.pairs.slice(0, 16).map((p, idx) => ({
+                        id: idx + 1,
+                        cardA: {
+                            text: p.cardA?.text || '',
+                            emoji: p.cardA?.emoji || '',
+                            image: p.cardA?.image || ''
+                        },
+                        cardB: {
+                            text: p.cardB?.text || '',
+                            emoji: p.cardB?.emoji || '',
+                            image: p.cardB?.image || ''
+                        }
+                    }));
+
+                    const nowMs = Date.now();
+                    const basePayload = {
+                        title: String(incoming.title).slice(0, 80),
+                        author: String(incoming.author || 'Compañero').slice(0, 60),
+                        description: String(incoming.description || '').slice(0, 140),
+                        pairCount: cleanedPairs.length,
+                        updatedAtClient: nowMs,
+                        pairs: cleanedPairs
+                    };
+
+                    if (db) {
+                        const newDocRef = await addDoc(collection(db, COLLECTION_NAME), {
+                            ...basePayload,
+                            updatedAt: serverTimestamp()
+                        });
+                        activeDeckId = newDocRef.id;
+                    } else {
+                        activeDeckId = `local_${nowMs}`;
+                        customDecks.unshift({ id: activeDeckId, isDefault: false, sortTimestamp: nowMs, ...basePayload });
+                        saveLocalBackupDecks(customDecks);
+                    }
+
+                    updateDeckSelectorUI();
+                    resetGame();
+                    showToast(`¡Mazo "${basePayload.title}" subido y compartido con el salón!`, 'success');
+                } catch (err) {
+                    showToast('El archivo seleccionado no es un memorama JSON válido.', 'error');
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        // Exponer funciones al ámbito global window para los manejadores onclick del HTML
+        Object.assign(window, {
+            toggleSound,
+            toggleTheme,
+            handleDeckChange,
+            editCurrentDeck,
+            resetGame,
+            handleCardClick,
+            closeVictoryModal,
+            openEditorModal,
+            closeEditorModal,
+            togglePairDropdown,
+            selectPairCount,
+            removeSpecificPair,
+            copyCardAToB,
+            openCardPlusMenu,
+            closeCardPlusMenu,
+            triggerCardFilePicker,
+            saveCardInlineInput,
+            clearCardContent,
+            handleImageUpload,
+            saveCustomDeck,
+            openDecksManagerModal,
+            closeDecksManagerModal,
+            renderDecksManagerList,
+            selectDeckFromManager,
+            requestDeleteDeck,
+            confirmDeleteDeck,
+            exportDeckToJSON,
+            importDeckFromJSON
+        });
+
+        // =====================================================================
+        // 11. INICIALIZACIÓN AL CARGAR LA PÁGINA
+        // =====================================================================
+        window.addEventListener('click', (e) => {
+            const dropdownMenu = document.getElementById('pair-dropdown-menu');
+            const dropdownBtn = document.getElementById('btn-pair-dropdown');
+            if (dropdownMenu && !dropdownMenu.classList.contains('hidden')) {
+                if (!dropdownMenu.contains(e.target) && dropdownBtn && !dropdownBtn.contains(e.target)) {
+                    closePairDropdown();
+                }
+            }
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            updateDeckSelectorUI();
+            resetGame();
+            initFirebaseCloud();
+        });
+    </script>
+</body>
+</html>
